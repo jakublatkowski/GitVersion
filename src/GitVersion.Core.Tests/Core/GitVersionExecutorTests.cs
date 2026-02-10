@@ -71,15 +71,27 @@ public class GitVersionExecutorTests : TestBase
         sp.DiscoverRepository();
 
         var preparer = this.sp.GetRequiredService<IGitPreparer>();
+        var repositoryInfo = this.sp.GetRequiredService<IGitRepositoryInfo>();
+        var dynamicRepositoryPath = repositoryInfo.DynamicGitRepositoryPath;
 
-        preparer.Prepare();
-        var cacheKeyFactory = this.sp.GetRequiredService<IGitVersionCacheKeyFactory>();
-        var cacheKey1 = cacheKeyFactory.Create(null);
-        preparer.Prepare();
+        try
+        {
+            preparer.Prepare();
+            var cacheKeyFactory = this.sp.GetRequiredService<IGitVersionCacheKeyFactory>();
+            var cacheKey1 = cacheKeyFactory.Create(null);
+            preparer.Prepare();
 
-        var cacheKey2 = cacheKeyFactory.Create(null);
+            var cacheKey2 = cacheKeyFactory.Create(null);
 
-        cacheKey2.Value.ShouldBe(cacheKey1.Value);
+            cacheKey2.Value.ShouldBe(cacheKey1.Value);
+        }
+        finally
+        {
+            if (dynamicRepositoryPath != null && FileSystemHelper.Directory.Exists(dynamicRepositoryPath))
+            {
+                FileSystemHelper.Directory.DeleteDirectory(dynamicRepositoryPath);
+            }
+        }
     }
 
     [Test]
@@ -103,6 +115,7 @@ public class GitVersionExecutorTests : TestBase
         using var fixture = new EmptyRepositoryFixture();
         fixture.Repository.MakeACommit();
         var worktreePath = GetWorktreePath(fixture);
+        string? dynamicRepositoryPath = null;
         try
         {
             // create a branch and a new worktree for it
@@ -118,7 +131,11 @@ public class GitVersionExecutorTests : TestBase
             sp.DiscoverRepository();
 
             var preparer = this.sp.GetRequiredService<IGitPreparer>();
+            var repositoryInfo = this.sp.GetRequiredService<IGitRepositoryInfo>();
             preparer.Prepare();
+
+            dynamicRepositoryPath = repositoryInfo.DynamicGitRepositoryPath;
+
             var cacheKeyFactory = this.sp.GetRequiredService<IGitVersionCacheKeyFactory>();
             var cacheKey = cacheKeyFactory.Create(null);
             cacheKey.Value.ShouldNotBeEmpty();
@@ -126,6 +143,10 @@ public class GitVersionExecutorTests : TestBase
         finally
         {
             FileSystemHelper.Directory.DeleteDirectory(worktreePath);
+            if (dynamicRepositoryPath != null && FileSystemHelper.Directory.Exists(dynamicRepositoryPath))
+            {
+                FileSystemHelper.Directory.DeleteDirectory(dynamicRepositoryPath);
+            }
         }
     }
 
